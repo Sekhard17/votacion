@@ -23,9 +23,11 @@ export default function AnonymousVoting() {
 
   useEffect(() => {
     fetchVotes()
+
+    // Suscribirse a los cambios en tiempo real (INSERTs) en la tabla 'votacion'
     const subscription = supabase
-      .channel('votes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'votes' }, fetchVotes)
+      .channel('public:votacion')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'votacion' }, fetchVotes)
       .subscribe()
 
     return () => {
@@ -35,7 +37,7 @@ export default function AnonymousVoting() {
 
   const fetchVotes = async () => {
     const { data, error } = await supabase
-      .from('votes')
+      .from('votacion')
       .select('type')
 
     if (error) {
@@ -43,7 +45,7 @@ export default function AnonymousVoting() {
       return
     }
 
-    const voteCount = data.reduce((acc, vote) => {
+    const voteCount = data.reduce((acc: { favor: number, contra: number }, vote: { type: string }) => {
       acc[vote.type as VoteType] += 1
       return acc
     }, { favor: 0, contra: 0 })
@@ -59,7 +61,7 @@ export default function AnonymousVoting() {
     }
 
     const { error } = await supabase
-      .from('votes')
+      .from('votacion')
       .insert({ type: vote })
 
     if (error) {
