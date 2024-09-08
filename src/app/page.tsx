@@ -4,50 +4,72 @@ import React, { useState, useEffect } from "react"
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js"
 import { Pie } from 'react-chartjs-2'
 import { Dialog, Transition } from '@headlessui/react'
-import { X, Check, AlertCircle, User, ThumbsUp, ThumbsDown } from "lucide-react"
+import { X, Check, AlertCircle, ThumbsUp, ThumbsDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { supabase } from "@/lib/supabase"
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
-export default function Votacion() {
-  const [votos, setVotos] = useState<{ favor: number; contra: number }>({ favor: 0, contra: 0 })
+type VoteType = 'favor' | 'contra'
+
+export default function AnonymousVoting() {
+  const [votes, setVotes] = useState<{ favor: number; contra: number }>({ favor: 0, contra: 0 })
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [nombre, setNombre] = useState('')
-  const [voto, setVoto] = useState<'favor' | 'contra' | null>(null)
+  const [vote, setVote] = useState<VoteType | null>(null)
   const [error, setError] = useState('')
-  const [isMounted, setIsMounted] = useState(false) // Nuevo estado para verificar si el componente está montado
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Solo accede a localStorage después de que el componente esté montado
-    setIsMounted(true)
-    const savedVotos = localStorage.getItem('votos')
-    if (savedVotos) {
-      setVotos(JSON.parse(savedVotos))
+    fetchVotes()
+    const subscription = supabase
+      .channel('votes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'votes' }, fetchVotes)
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
     }
   }, [])
 
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('votos', JSON.stringify(votos))
-    }
-  }, [votos, isMounted])
+  const fetchVotes = async () => {
+    const { data, error } = await supabase
+      .from('votes')
+      .select('type')
 
-  const handleVotar = () => {
-    if (!nombre || !voto) {
-      setError('Por favor, complete todos los campos')
+    if (error) {
+      console.error('Error fetching votes:', error)
       return
     }
 
-    setVotos((prevVotos) => ({
-      ...prevVotos,
-      [voto]: prevVotos[voto] + 1
-    }))
+    const voteCount = data.reduce((acc, vote) => {
+      acc[vote.type as VoteType] += 1
+      return acc
+    }, { favor: 0, contra: 0 })
+
+    setVotes(voteCount)
+    setIsLoading(false)
+  }
+
+  const handleVote = async () => {
+    if (!vote) {
+      setError('Por favor, seleccione una opción')
+      return
+    }
+
+    const { error } = await supabase
+      .from('votes')
+      .insert({ type: vote })
+
+    if (error) {
+      console.error('Error submitting vote:', error)
+      setError('Hubo un error al emitir su voto. Por favor, intente nuevamente.')
+      return
+    }
+
     setIsModalOpen(false)
-    setNombre('')
-    setVoto(null)
+    setVote(null)
     setError('')
   }
 
@@ -55,38 +77,41 @@ export default function Votacion() {
     labels: ['A favor', 'En contra'],
     datasets: [
       {
-        data: [votos.favor, votos.contra],
+        data: [votes.favor, votes.contra],
         backgroundColor: ['#10B981', '#EF4444'],
         hoverBackgroundColor: ['#059669', '#DC2626']
       }
     ]
   }
 
-  if (!isMounted) {
-    // Muestra un loading o valores temporales hasta que el componente esté montado
-    return <div>Cargando...</div>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
       <div className="max-w-md w-full mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
         <div className="px-6 py-8">
-          <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">Votación</h1>
+          <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">Votación Anónima</h1>
           <h2 className="text-xl text-center text-gray-600 mb-8">Innovación y Emprendimiento - B50-N4-P12-C1</h2>
           <h2 className="text-xl text-center text-gray-600 mb-8">¿Estás de acuerdo con cambiar al profesor?</h2>
 
-          <div className="mb-8">
+          <div className="mb-8 h-64">
             <Pie data={data} options={{ responsive: true, maintainAspectRatio: false }} />
           </div>
 
           <div className="flex justify-center space-x-8 mb-8">
             <span className="flex items-center text-lg font-medium text-green-600">
               <ThumbsUp className="w-6 h-6 mr-2" />
-              A favor: {votos.favor}
+              A favor: {votes.favor}
             </span>
             <span className="flex items-center text-lg font-medium text-red-600">
               <ThumbsDown className="w-6 h-6 mr-2" />
-              En contra: {votos.contra}
+              En contra: {votes.contra}
             </span>
           </div>
 
@@ -128,7 +153,7 @@ export default function Votacion() {
                     as="h3"
                     className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center mb-4"
                   >
-                    Emitir voto
+                    Emitir voto anónimo
                     <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
                       <X className="h-6 w-6" />
                     </Button>
@@ -136,27 +161,8 @@ export default function Votacion() {
 
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="nombre" className="text-sm font-medium text-gray-700">
-                        Nombre completo
-                      </Label>
-                      <div className="mt-1 relative rounded-md shadow-sm">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <User className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <Input
-                          type="text"
-                          id="nombre"
-                          value={nombre}
-                          onChange={(e) => setNombre(e.target.value)}
-                          className="pl-10"
-                          placeholder="Ingrese su nombre"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
                       <Label className="text-sm font-medium text-gray-700">Su voto</Label>
-                      <RadioGroup value={voto ?? undefined} onValueChange={(value) => setVoto(value as 'favor' | 'contra')}>
+                      <RadioGroup value={vote ?? undefined} onValueChange={(value) => setVote(value as VoteType)}>
                         <div className="flex space-x-4 mt-1">
                           <div className="flex items-center">
                             <RadioGroupItem value="favor" id="favor" />
@@ -179,9 +185,9 @@ export default function Votacion() {
                   )}
 
                   <div className="mt-6">
-                    <Button onClick={handleVotar} className="w-full">
+                    <Button onClick={handleVote} className="w-full">
                       <Check className="h-5 w-5 mr-2" />
-                      Emitir voto
+                      Emitir voto anónimo
                     </Button>
                   </div>
                 </Dialog.Panel>
