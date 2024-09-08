@@ -1,101 +1,194 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import React, { useState, useEffect } from "react"
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js"
+import { Pie } from 'react-chartjs-2'
+import { Dialog, Transition } from '@headlessui/react'
+import { X, Check, AlertCircle, User, ThumbsUp, ThumbsDown } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+
+ChartJS.register(ArcElement, Tooltip, Legend)
+
+export default function Votacion() {
+  const [votos, setVotos] = useState<{ favor: number; contra: number }>({ favor: 0, contra: 0 })
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const [voto, setVoto] = useState<'favor' | 'contra' | null>(null)
+  const [error, setError] = useState('')
+  const [isMounted, setIsMounted] = useState(false) // Nuevo estado para verificar si el componente está montado
+
+  useEffect(() => {
+    // Solo accede a localStorage después de que el componente esté montado
+    setIsMounted(true)
+    const savedVotos = localStorage.getItem('votos')
+    if (savedVotos) {
+      setVotos(JSON.parse(savedVotos))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('votos', JSON.stringify(votos))
+    }
+  }, [votos, isMounted])
+
+  const handleVotar = () => {
+    if (!nombre || !voto) {
+      setError('Por favor, complete todos los campos')
+      return
+    }
+
+    setVotos((prevVotos) => ({
+      ...prevVotos,
+      [voto]: prevVotos[voto] + 1
+    }))
+    setIsModalOpen(false)
+    setNombre('')
+    setVoto(null)
+    setError('')
+  }
+
+  const data = {
+    labels: ['A favor', 'En contra'],
+    datasets: [
+      {
+        data: [votos.favor, votos.contra],
+        backgroundColor: ['#10B981', '#EF4444'],
+        hoverBackgroundColor: ['#059669', '#DC2626']
+      }
+    ]
+  }
+
+  if (!isMounted) {
+    // Muestra un loading o valores temporales hasta que el componente esté montado
+    return <div>Cargando...</div>
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
+      <div className="max-w-md w-full mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
+        <div className="px-6 py-8">
+          <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">Votación</h1>
+          <h2 className="text-xl text-center text-gray-600 mb-8">Innovación y Emprendimiento - B50-N4-P12-C1</h2>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          <div className="mb-8">
+            <Pie data={data} options={{ responsive: true, maintainAspectRatio: false }} />
+          </div>
+
+          <div className="flex justify-center space-x-8 mb-8">
+            <span className="flex items-center text-lg font-medium text-green-600">
+              <ThumbsUp className="w-6 h-6 mr-2" />
+              A favor: {votos.favor}
+            </span>
+            <span className="flex items-center text-lg font-medium text-red-600">
+              <ThumbsDown className="w-6 h-6 mr-2" />
+              En contra: {votos.contra}
+            </span>
+          </div>
+
+          <div className="flex justify-center">
+            <Button onClick={() => setIsModalOpen(true)} className="px-6 py-3 text-lg">
+              Emitir Voto
+            </Button>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      <Transition appear show={isModalOpen} as={React.Fragment}>
+        <Dialog as="div" className="relative z-10" onClose={() => setIsModalOpen(false)}>
+          <Transition.Child
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={React.Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center mb-4"
+                  >
+                    Emitir voto
+                    <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
+                      <X className="h-6 w-6" />
+                    </Button>
+                  </Dialog.Title>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="nombre" className="text-sm font-medium text-gray-700">
+                        Nombre completo
+                      </Label>
+                      <div className="mt-1 relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <User className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <Input
+                          type="text"
+                          id="nombre"
+                          value={nombre}
+                          onChange={(e) => setNombre(e.target.value)}
+                          className="pl-10"
+                          placeholder="Ingrese su nombre"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Su voto</Label>
+                      <RadioGroup value={voto ?? undefined} onValueChange={(value) => setVoto(value as 'favor' | 'contra')}>
+                        <div className="flex space-x-4 mt-1">
+                          <div className="flex items-center">
+                            <RadioGroupItem value="favor" id="favor" />
+                            <Label htmlFor="favor" className="ml-2">A favor</Label>
+                          </div>
+                          <div className="flex items-center">
+                            <RadioGroupItem value="contra" id="contra" />
+                            <Label htmlFor="contra" className="ml-2">En contra</Label>
+                          </div>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="mt-2 text-red-500 flex items-center">
+                      <AlertCircle className="h-5 w-5 mr-2" />
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="mt-6">
+                    <Button onClick={handleVotar} className="w-full">
+                      <Check className="h-5 w-5 mr-2" />
+                      Emitir voto
+                    </Button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
-  );
+  )
 }
