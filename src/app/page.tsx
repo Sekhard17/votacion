@@ -73,6 +73,7 @@ export default function Votacion() {
         <div className="px-6 py-8">
           <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">Votación</h1>
           <h2 className="text-xl text-center text-gray-600 mb-8">Innovación y Emprendimiento - B50-N4-P12-C1</h2>
+          <h2 className="text-xl text-center text-gray-600 mb-8">¿Estás de acuerdo con cambiar al profesor?</h2>
 
           <div className="mb-8">
             <Pie data={data} options={{ responsive: true, maintainAspectRatio: false }} />
